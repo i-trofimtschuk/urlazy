@@ -1,0 +1,12 @@
+language: python
+os: linux
+dist: "focal"
+python:
+  - "3.7"
+  - "3.8"
+  - "3.9"
+install:
+  - pip install mypy
+script:
+  - python -m doctest -v urlazy.py
+  - mypy urlazy.py
