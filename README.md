@@ -3,8 +3,8 @@ URLazy
 
 [![Build Status](https://app.travis-ci.com/i-trofimtschuk/urlazy.svg?branch=master)](https://app.travis-ci.com/i-trofimtschuk/urlazy)
 
-URLazy lets you build urls incrementally (lazy) which is it's sole purpose.
-Parsing or modifying URLs is explicitly out ouf scope of this project.
+URLazy lets you build or extend existing urls incrementally (lazy) which is it's sole purpose.
+To build/extend from existing URLs `from_string` method can be used.
 
 Here are some examples how you can build URLs using URLazy:
 
@@ -69,3 +69,7 @@ Here are some examples how you can build URLs using URLazy:
 	>>> (URL.https().username('user').password('pwd').hostname('www.youtube.com').port(443).path('/').query([('a', 1), ('b', 2)]).query([('a', 3)]).fragment('fragment').fragment('-more-fragment')).url
 	'https://user:pwd@www.youtube.com:443/?a=1&b=2&a=3#fragment-more-fragment'
 
+# extending existing urls
+        
+	>>> (URL.from_string('https://www.youtube.com/old_path') / 'watch' & 'v=dQw4w9WgXcQ' | 'fragment').url
+        'https://www.youtube.com/old_path/watch?v=dQw4w9WgXcQ#fragment'

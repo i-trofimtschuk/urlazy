@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import List, Tuple, Union
-from urllib.parse import ParseResult, urlencode
+from urllib.parse import ParseResult, parse_qsl, urlencode, urlparse
 
 __version__ = '0.0.1.dev'
 
@@ -13,6 +13,10 @@ Path = List[str]
 @dataclass()
 class URL:
     """Build URLs incrementally
+
+    # syntactic sugar
+    >>> str(HTTPS() // 'www.youtube.com' / 'watch' & 'v=dQw4w9WgXcQ' | 'fragment')
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ#fragment'
 
     # one way
     >>> url = HTTPS() // 'www.youtube.com'
@@ -58,7 +62,7 @@ class URL:
     >>> (HTTPS() // 'www.youtube.com' / 'watch' & {'v': 'dQw4w9WgXcQ'}).url
     'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 
-    >>> (URL.https().hostname('www.youtube.com').path('watch').query({'v': 'dQw4w9WgXcQ'})).url
+    >>> URL.https().hostname('www.youtube.com').path('watch').query({'v': 'dQw4w9WgXcQ'}).url
     'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 
     >>> (HTTPS() // URL().hostname('www.youtube.com') / URL().path('watch') & URL().query({'v': 'dQw4w9WgXcQ'}) | URL().fragment('fragment')).url
@@ -67,9 +71,17 @@ class URL:
     >>> (HTTPS() // 'www.youtube.com' / 'path1' / 'path2' / '' & [('a', 1), ('b', 2)] & [('a', 3)] | 'fragment' | '-more-fragment').url
     'https://www.youtube.com/path1/path2/?a=1&b=2&a=3#fragment-more-fragment'
 
-    >>> (URL.https().username('user').password('pwd').hostname('www.youtube.com').port(443).path('/').query([('a', 1), ('b', 2)]).query([('a', 3)]).fragment('fragment').fragment('-more-fragment')).url
+    >>> URL.https().username('user').password('pwd').hostname('www.youtube.com').port(443).path('/').query([('a', 1), ('b', 2)]).query([('a', 3)]).fragment('fragment').fragment('-more-fragment').url
     'https://user:pwd@www.youtube.com:443/?a=1&b=2&a=3#fragment-more-fragment'
 
+    >>> URL.from_string('https://user:pwd@www.youtube.com:443/?a=1&b=2&a=3#fragment-more-fragment').url
+    'https://user:pwd@www.youtube.com:443/?a=1&b=2&a=3#fragment-more-fragment'
+
+    >>> (URL.from_string('https://user:pwd@www.youtube.com:443/?a=1&b=2&a=3#fragment-more-fragment') & {'tracking': 'param'}).url
+    'https://user:pwd@www.youtube.com:443/?a=1&b=2&a=3&tracking=param#fragment-more-fragment'
+
+    >>> (URL.from_string('https://www.youtube.com') / 'watch' & 'v=dQw4w9WgXcQ' | 'fragment').url
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ#fragment'
     """
     _scheme: str = ''
     _username: str = ''
@@ -125,8 +137,10 @@ class URL:
         self._path.append(path)
         return self
 
-    def query(self, query: Union[Query, dict]) -> URL:
-        if isinstance(query, dict):
+    def query(self, query: Union[Query, dict, str]) -> URL:
+        if isinstance(query, str):
+            self._query.extend(parse_qsl(query))
+        elif isinstance(query, dict):
             self._query.extend(query.items())
         else:
             self._query.extend(query)
@@ -155,6 +169,28 @@ class URL:
             params='',
             query=urlencode(self._query),
             fragment=self._fragment)
+
+    @staticmethod
+    def from_string(url: str) -> URL:
+        parse_result = urlparse(url)
+        url_obj = URL().scheme(parse_result.scheme)
+
+        auth, _, host_port = parse_result.netloc.rpartition('@')
+        if auth:
+            _username, _, _password = auth.partition(':')
+            url_obj.username(_username)
+            if _password:
+                url_obj.password(_password)
+        _hostname, _, _port = host_port.partition(':')
+        url_obj.hostname(_hostname)
+        if _port:
+            url_obj.port(_port)
+
+        url_obj._path = parse_result.path.split('/')
+        url_obj._query = parse_qsl(parse_result.query)
+        url_obj._fragment = parse_result.fragment
+
+        return url_obj
 
     def __floordiv__(self, other: Union[URL, str]) -> URL:
         if isinstance(other, URL):
